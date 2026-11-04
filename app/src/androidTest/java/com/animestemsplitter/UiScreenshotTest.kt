@@ -85,6 +85,8 @@ class UiScreenshotTest {
         rule.onNodeWithText("BGM").performClick()
         SystemClock.sleep(1500)
         shot("3b_trim_bgm")
+        rule.onNodeWithText("セリフ").performClick()
+        SystemClock.sleep(800)
 
         // 切り取って保存
         rule.onNodeWithText("セリフを保存").performScrollTo().performClick()
