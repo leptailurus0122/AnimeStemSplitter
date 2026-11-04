@@ -61,6 +61,9 @@ class OnnxStemModel private constructor(
             val env = OrtEnvironment.getEnvironment()
             val opts = OrtSession.SessionOptions().apply {
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
+                // 計算用メモリを使い回さず都度返す（常駐メモリを減らす。メモリ不足で落ちるのを防ぐ）
+                setCPUArenaAllocator(false)
+                setMemoryPatternOptimization(false)
                 // 高性能コア中心に使う（小さいコアまで使うと逆に遅くなることがある）
                 setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 6))
             }
