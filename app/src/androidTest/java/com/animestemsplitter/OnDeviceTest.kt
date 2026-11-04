@@ -40,9 +40,19 @@ class OnDeviceTest {
         return f
     }
 
-    @Test
-    fun pipelineEndToEnd() {
-        val f = makeWav(3.0)
+    /** テスト用の音声（CI で ffmpeg が作る）を取り出す */
+    private fun testAsset(name: String): File {
+        val f = File(ctx.cacheDir, name)
+        InstrumentationRegistry.getInstrumentation().context.assets.open(name).use { i -> f.outputStream().use { i.copyTo(it) } }
+        return f
+    }
+
+    @Test fun wav48k() = separate(makeWav(3.0), 3.0)
+    @Test fun aacM4a() = separate(testAsset("stereo_48k.m4a"), 3.0)
+    @Test fun mp4WithVideo51() = separate(testAsset("video_51.mp4"), 3.0)
+    @Test fun mp3Mono() = separate(testAsset("mono_44k.mp3"), 3.0)
+
+    private fun separate(f: File, seconds: Double) {
         val t0 = SystemClock.elapsedRealtime()
         val r = SeparationPipeline(ctx).run(
             Uri.fromFile(f), f.name,
@@ -53,7 +63,9 @@ class OnDeviceTest {
         STEMS.forEach { stem ->
             WavReader(r.file(stem)).use {
                 Log.i(tag, "$stem frames=${it.frames} sr=${it.sampleRate}")
-                assertTrue("$stem frames=${it.frames}", kotlin.math.abs(it.frames - 3 * 44100) < 10)
+                // AAC/MP3 は先頭に数十ミリ秒の無音が付くことがあるので少し幅を持たせる
+                val expect = seconds * 44100
+                assertTrue("${f.name} $stem frames=${it.frames}", kotlin.math.abs(it.frames - expect) < 44100 * 0.1)
             }
         }
     }

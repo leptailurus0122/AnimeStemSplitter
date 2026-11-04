@@ -7,3 +7,4 @@ tools/.cache/
 tools/**/__pycache__/
 app/src/main/assets/bandit_plus.onnx
 app/src/main/assets/model_meta.json
+app/src/androidTest/assets/

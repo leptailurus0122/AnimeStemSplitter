@@ -42,7 +42,11 @@ class AudioDecoder(private val context: Context, private val uri: Uri) {
                 throw IllegalArgumentException("この音声形式（$mime）はこの端末で読み込めません。")
             }
             try {
-                fmt.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_FLOAT)
+                // 圧縮音声（AAC など）は float で出してもらう。
+                // WAV（audio/raw）はそのまま素通しなので、元の形式を変えてはいけない
+                if (mime != MediaFormat.MIMETYPE_AUDIO_RAW) {
+                    fmt.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_FLOAT)
+                }
                 codec.configure(fmt, null, null, 0)
                 codec.start()
                 run(ex, codec, { sr -> onFormat(sr, durationUs) }, onPcm, isCancelled)
@@ -104,15 +108,32 @@ class AudioDecoder(private val context: Context, private val uri: Uri) {
                     val buf = codec.getOutputBuffer(out)!!.order(ByteOrder.nativeOrder())
                     buf.position(info.offset)
                     buf.limit(info.offset + info.size)
-                    val bytesPerSample = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
+                    val bytesPerSample = when (encoding) {
+                        AudioFormat.ENCODING_PCM_FLOAT -> 4
+                        AudioFormat.ENCODING_PCM_16BIT -> 2
+                        AudioFormat.ENCODING_PCM_8BIT -> 1
+                        AudioFormat.ENCODING_PCM_24BIT_PACKED -> 3
+                        AudioFormat.ENCODING_PCM_32BIT -> 4
+                        else -> throw IllegalArgumentException("対応していない音声形式です (encoding=$encoding)")
+                    }
                     val frames = info.size / (bytesPerSample * channels)
                     if (frames > 0) {
                         if (stereo.size < frames * 2) stereo = FloatArray(frames * 2)
                         val raw = FloatArray(channels)
                         for (f in 0 until frames) {
                             for (c in 0 until channels) {
-                                raw[c] = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) buf.getFloat()
-                                else buf.getShort() / 32768f
+                                raw[c] = when (encoding) {
+                                    AudioFormat.ENCODING_PCM_FLOAT -> buf.getFloat()
+                                    AudioFormat.ENCODING_PCM_16BIT -> buf.getShort() / 32768f
+                                    AudioFormat.ENCODING_PCM_8BIT -> ((buf.get().toInt() and 0xFF) - 128) / 128f
+                                    AudioFormat.ENCODING_PCM_24BIT_PACKED -> {
+                                        val b0 = buf.get().toInt() and 0xFF
+                                        val b1 = buf.get().toInt() and 0xFF
+                                        val b2 = buf.get().toInt()
+                                        ((b2 shl 16) or (b1 shl 8) or b0) / 8388608f
+                                    }
+                                    else -> buf.getInt() / 2147483648f
+                                }
                             }
                             downmix(raw, channels, stereo, f)
                         }
