@@ -1,16 +1,18 @@
 #!/bin/bash
 # エミュレーター上で自動テストを実行し、ログを残す
 adb logcat -c
-adb logcat -b crash -c
-./gradlew --no-daemon connectedDebugAndroidTest
+./gradlew --no-daemon connectedDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 status=$?
 adb logcat -d > logcat.txt
+echo "===== exit-info ====="
+adb shell dumpsys activity exit-info com.animestemsplitter | head -80
 echo "===== crash buffer ====="
-adb logcat -d -b crash | head -200
-echo "===== app log (filtered) ====="
-grep -E "com.animestemsplitter|OnDeviceTest|TestRunner|DEBUG|libc|AndroidRuntime|CCodec|MediaCodec|onnx" logcat.txt \
-  | grep -v -E "Access denied|achh" | tail -120
-echo "===== app diag ====="
-adb shell run-as com.animestemsplitter cat files/diag/crash.txt 2>/dev/null || true
-adb shell run-as com.animestemsplitter cat files/diag/running.txt 2>/dev/null || true
+adb logcat -d -b crash | head -150
+pid=$(grep -oP 'Process com\.animestemsplitter \(pid \K[0-9]+' logcat.txt | head -1)
+echo "===== app process log (pid=$pid) ====="
+if [ -n "$pid" ]; then grep -E "^\S+ \S+ +$pid " logcat.txt | grep -v -E "progress|Access denied" | tail -100; fi
+echo "===== around death ====="
+grep -n "has died" logcat.txt | head -3
+ln=$(grep -n "Process com.animestemsplitter (pid" logcat.txt | head -1 | cut -d: -f1)
+if [ -n "$ln" ]; then sed -n "$((ln-40)),$((ln+5))p" logcat.txt | grep -v -E "Access denied|achh|nativeloader"; fi
 exit $status
