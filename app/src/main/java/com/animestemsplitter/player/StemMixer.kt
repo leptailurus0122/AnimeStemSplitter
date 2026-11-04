@@ -28,6 +28,22 @@ class StemMixer(files: List<File>) {
     private val _position = MutableStateFlow(0L)
     val position: StateFlow<Long> = _position
 
+    // 範囲再生（切り取り画面用）。rangeEnd < 0 なら全体
+    @Volatile private var rangeStart = 0L
+    @Volatile private var rangeEnd = -1L
+    @Volatile private var loopRange = false
+
+    /** start〜end だけを再生する。loop=true なら繰り返す */
+    fun setRange(start: Long, end: Long, loop: Boolean) {
+        rangeStart = start.coerceIn(0, frames)
+        rangeEnd = end.coerceIn(rangeStart, frames)
+        loopRange = loop
+    }
+
+    fun clearRange() { rangeStart = 0; rangeEnd = -1; loopRange = false }
+
+    private fun endFrame() = if (rangeEnd >= 0) rangeEnd else frames
+
     @Volatile private var readPos = 0L
     @Volatile private var seekTo = -1L
     @Volatile private var running = false
@@ -50,7 +66,7 @@ class StemMixer(files: List<File>) {
 
     fun play() {
         if (released) return
-        if (readPos >= frames) seek(0)
+        if (readPos >= endFrame() || readPos < rangeStart) seek(rangeStart)
         synchronized(lock) {
             if (track == null) track = buildTrack()
             track!!.play()
@@ -104,9 +120,12 @@ class StemMixer(files: List<File>) {
         val block = 2048
         val tmp = FloatArray(block * 2)
         val mix = FloatArray(block * 2)
-        // track の再生ヘッドが playedBase のとき、聞こえている位置が headBase
+        // 再生ヘッド（playedBase からの再生済みフレーム数）→ 曲中の位置 の対応表。
+        // 範囲ループで先頭に戻ったときに印を追加する
         var playedBase = track?.playbackHeadPosition?.toLong() ?: 0L
-        var headBase = _position.value
+        val marks = ArrayDeque<LongArray>()
+        marks.add(longArrayOf(0L, _position.value))
+        var written = (readPos - _position.value).coerceAtLeast(0)   // 一時停止前に送ってまだ鳴っていない分
         while (running && !released) {
             val t = track ?: break
             val s = seekTo
@@ -114,15 +133,30 @@ class StemMixer(files: List<File>) {
                 seekTo = -1
                 synchronized(lock) { t.pause(); t.flush(); if (running) t.play() }
                 readPos = s
-                headBase = s
                 playedBase = t.playbackHeadPosition.toLong()
+                written = 0
+                marks.clear(); marks.add(longArrayOf(0L, s))
             }
-            val n = minOf(block.toLong(), frames - readPos).toInt()
+            val end = endFrame()
+            var n = minOf(block.toLong(), end - readPos).toInt()
             if (n <= 0) {
-                // 最後まで再生したら止める
-                Thread.sleep(200)
-                if (running) { pause(); readPos = frames; _position.value = frames }
-                break
+                if (rangeEnd >= 0 && loopRange) {
+                    readPos = rangeStart
+                    marks.add(longArrayOf(written, rangeStart))
+                    n = minOf(block.toLong(), end - readPos).toInt()
+                    if (n <= 0) { Thread.sleep(20); continue }
+                } else {
+                    // 最後まで再生したら止めて、先頭（範囲の始め）に戻す
+                    Thread.sleep(200)
+                    if (running) {
+                        pause()
+                        val back = if (rangeEnd >= 0) rangeStart else frames
+                        readPos = back
+                        _position.value = back
+                        synchronized(lock) { t.flush() }
+                    }
+                    break
+                }
             }
             java.util.Arrays.fill(mix, 0, n * 2, 0f)
             for (i in readers.indices) {
@@ -141,8 +175,11 @@ class StemMixer(files: List<File>) {
             val w = t.write(mix, 0, n * 2, AudioTrack.WRITE_BLOCKING)
             if (w < 0) break
             readPos += n
+            written += n
             val head = (t.playbackHeadPosition.toLong() - playedBase).coerceAtLeast(0)
-            if (seekTo < 0) _position.value = (headBase + head).coerceAtMost(frames)
+            while (marks.size > 1 && marks[1][0] <= head) marks.removeFirst()
+            val m = marks.first()
+            if (seekTo < 0) _position.value = (m[1] + (head - m[0])).coerceIn(0, frames)
         }
     }
 }

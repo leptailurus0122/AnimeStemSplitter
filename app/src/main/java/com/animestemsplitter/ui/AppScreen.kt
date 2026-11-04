@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,6 +63,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.compose.ui.res.painterResource
+import com.animestemsplitter.R
 import com.animestemsplitter.data.JobRepository
 import com.animestemsplitter.data.JobState
 import com.animestemsplitter.data.ResultStore
@@ -84,6 +87,7 @@ fun AppScreen(onPickFile: () -> Unit) {
     val job by JobRepository.state.collectAsState()
     val history = remember { mutableStateListOf<StemResult>() }
     var selected by remember { mutableStateOf<StemResult?>(null) }
+    var trim by remember { mutableStateOf<Pair<StemResult, String>?>(null) }
 
     fun reload() {
         history.clear(); history.addAll(ResultStore.list(ctx))
@@ -93,6 +97,12 @@ fun AppScreen(onPickFile: () -> Unit) {
     LaunchedEffect(job) {
         if (job is JobState.Done) { reload(); selected = (job as JobState.Done).result }
     }
+
+    trim?.let { (r, stem) ->
+        TrimScreen(r, stem, onClose = { trim = null })
+        return
+    }
+    val onTrim: (StemResult, String) -> Unit = { r, stem -> trim = r to stem }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         val wide = maxWidth >= 640.dp   // 開いた Fold・タブレット
@@ -109,7 +119,7 @@ fun AppScreen(onPickFile: () -> Unit) {
         }
         val right: @Composable () -> Unit = {
             val r = selected
-            if (r != null) MixerCard(r) else if (wide) EmptyMixer()
+            if (r != null) MixerCard(r, onTrim) else if (wide) EmptyMixer()
         }
         if (wide) {
             Row(Modifier.fillMaxSize().padding(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -124,7 +134,7 @@ fun AppScreen(onPickFile: () -> Unit) {
                 Header()
                 Spacer(Modifier.height(20.dp))
                 JobCard(job, onPickFile)
-                selected?.let { Spacer(Modifier.height(16.dp)); MixerCard(it) }
+                selected?.let { Spacer(Modifier.height(16.dp)); MixerCard(it, onTrim) }
                 if (history.isNotEmpty()) {
                     Spacer(Modifier.height(24.dp))
                     HistoryList(history, selected?.id, onSelect = { selected = it }, onDelete = {
@@ -217,8 +227,9 @@ private fun EmptyMixer() {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun MixerCard(r: StemResult) {
+private fun MixerCard(r: StemResult, onTrim: (StemResult, String) -> Unit) {
     val ctx = LocalContext.current
     val dark = isSystemInDarkTheme()
     val scope = rememberCoroutineScope()
@@ -273,11 +284,11 @@ private fun MixerCard(r: StemResult) {
         }
         Spacer(Modifier.height(10.dp))
         STEMS.forEachIndexed { i, stem ->
-            StemRow(stem, StemColors.of(stem, dark), mixer, i, r)
+            StemRow(stem, StemColors.of(stem, dark), mixer, i, r) { onTrim(r, stem) }
             Spacer(Modifier.height(8.dp))
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(
                 onClick = {
                     scope.launch {
@@ -290,6 +301,9 @@ private fun MixerCard(r: StemResult) {
                 },
                 shape = RoundedCornerShape(12.dp),
             ) { Text("3トラックを保存", fontWeight = FontWeight.Bold) }
+            OutlinedButton(onClick = { onTrim(r, STEMS[0]) }, shape = RoundedCornerShape(12.dp)) {
+                Icon(painterResource(R.drawable.ic_cut), null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("切り取り")
+            }
             OutlinedButton(onClick = { share(ctx, r, STEMS) }, shape = RoundedCornerShape(12.dp)) {
                 Icon(Icons.Filled.Share, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("共有")
             }
@@ -298,7 +312,7 @@ private fun MixerCard(r: StemResult) {
 }
 
 @Composable
-private fun StemRow(stem: String, color: Color, mixer: StemMixer, index: Int, r: StemResult) {
+private fun StemRow(stem: String, color: Color, mixer: StemMixer, index: Int, r: StemResult, onTrim: () -> Unit) {
     val key = r.id
     val ctx = LocalContext.current
     var vol by remember(key) { mutableFloatStateOf(1f) }
@@ -318,6 +332,9 @@ private fun StemRow(stem: String, color: Color, mixer: StemMixer, index: Int, r:
                 FilterChip(selected = solo, onClick = { solo = !solo; mixer.setSolo(index, solo) }, label = { Text("ソロ") })
                 Spacer(Modifier.width(6.dp))
                 FilterChip(selected = mute, onClick = { mute = !mute; mixer.setMute(index, mute) }, label = { Text("ミュート") })
+                IconButton(onClick = onTrim) {
+                    Icon(painterResource(R.drawable.ic_cut), "$label を切り取る", Modifier.size(18.dp))
+                }
                 IconButton(onClick = { share(ctx, r, listOf(stem)) }) {
                     Icon(Icons.Filled.Share, "$label を共有", Modifier.size(18.dp))
                 }
