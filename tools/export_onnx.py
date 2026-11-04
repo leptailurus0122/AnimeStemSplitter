@@ -127,7 +127,7 @@ class WaveToWave(nn.Module):
                 h = nmlp.output(nmlp.hidden(nmlp.norm(q[:, i])))        # (b, T, bw*2)
                 m = h.reshape(b, T, fe - fs, 2).permute(0, 2, 1, 3)      # (b, bw, T, 2)
                 if use_fw:
-                    m = m * mem.get_buffer(f"freq_weights/{i}")[:, None, None]
+                    m = m * mem.get_buffer(f"freq_weights/{i}").to(m.dtype)[:, None, None]
                 m = F.pad(m, (0, 0, 0, 0, fs, self.n_freq - fe))         # (b, F, T, 2)
                 mask = m if mask is None else mask + m
             mr, mi = mask[..., 0], mask[..., 1]
