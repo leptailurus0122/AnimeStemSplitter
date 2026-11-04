@@ -78,7 +78,6 @@ object Diagnostics {
                 ApplicationExitInfo.REASON_ANR, ApplicationExitInfo.REASON_LOW_MEMORY,
                 ApplicationExitInfo.REASON_SIGNALED, ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
                 ApplicationExitInfo.REASON_INITIALIZATION_FAILURE, ApplicationExitInfo.REASON_DEPENDENCY_DIED,
-                ApplicationExitInfo.REASON_OTHER, ApplicationExitInfo.REASON_UNKNOWN,
             )
         }
         if (bad.isEmpty()) return null

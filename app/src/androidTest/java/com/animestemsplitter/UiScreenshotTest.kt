@@ -37,6 +37,8 @@ class UiScreenshotTest {
         @BeforeClass @JvmStatic
         fun prepareResult() {
             val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+            // 他のテストが残した記録で「前回終了しました」が出ないように消しておく
+            File(ctx.filesDir, "diag").deleteRecursively()
             if (ResultStore.list(ctx).isNotEmpty()) return
             // 音量が変わる 4 秒の音（波形が見やすいように）
             val rate = 44100

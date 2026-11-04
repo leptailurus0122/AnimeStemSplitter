@@ -65,21 +65,25 @@ class SeparationService : Service() {
         return START_NOT_STICKY
     }
 
-    /** 通知つきで実行（失敗しても処理自体は続ける） */
+    /** 通知つきで実行（失敗しても処理自体は続ける）。断られたら次の種類で試す */
     private fun goForeground(name: String) {
         val n = buildNotification(name, "準備中…", -1)
         val types = buildList {
             if (Build.VERSION.SDK_INT >= 35) add(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
             add(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         }
+        var last: Exception? = null
         for (t in types) {
             try {
                 ServiceCompat.startForeground(this, NOTIF_ID, n, t)
                 return
             } catch (e: Exception) {
-                Diagnostics.writeCrash("startForeground(type=$t)", e)
+                android.util.Log.w("SeparationService", "startForeground(type=$t) refused", e)
+                last = e
             }
         }
+        // どれも使えなかったときだけ記録（処理は通知なしで続ける）
+        last?.let { Diagnostics.writeCrash("startForeground（通知なしで続行）", it) }
     }
 
     private fun work(uri: Uri, name: String) {
