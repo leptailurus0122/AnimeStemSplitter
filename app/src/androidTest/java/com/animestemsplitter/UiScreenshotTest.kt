@@ -92,20 +92,21 @@ class UiScreenshotTest {
         rule.onNodeWithText("セリフを保存").performScrollTo().performClick()
         rule.waitForIdle()
         shot("4a_after_save")
-        val r = ResultStore.list(ctx).first()
-        android.util.Log.i("Trim", "test looks in ${ResultStore.clipsDir(r)} results=${ResultStore.list(ctx).map { it.dir.name + "/" + it.name }}")
+        // 画面で開いている結果がどれでも見つけられるよう、全部の結果の clips を探す
         val deadline = SystemClock.elapsedRealtime() + 15_000
-        var clip: File? = null
-        while (SystemClock.elapsedRealtime() < deadline && clip == null) {
-            clip = ResultStore.clipsDir(r).listFiles()?.firstOrNull { it.name.contains("dialogue") && it.length() > 44 }
+        var found: Pair<com.animestemsplitter.data.StemResult, File>? = null
+        while (SystemClock.elapsedRealtime() < deadline && found == null) {
+            found = ResultStore.list(ctx).firstNotNullOfOrNull { res ->
+                File(res.dir, "clips").listFiles()?.firstOrNull { it.name.contains("dialogue") && it.length() > 44 }?.let { res to it }
+            }
             SystemClock.sleep(200)
         }
-        android.util.Log.i("Trim", "clips dir: ${ResultStore.list(ctx).map { it.dir.name to (java.io.File(it.dir, "clips").list()?.toList()) }}")
-        assertTrue("clip not written", clip != null)
+        assertTrue("clip not written", found != null)
         SystemClock.sleep(500)
+        val (r, clip) = found!!
         val whole = WavReader(r.file("dialogue")).use { it.frames }
         val expect = if (whole <= 30L * 44100) whole * 3 / 4 - whole / 4 else 15L * 44100
-        WavReader(clip!!).use { assertTrue("clip frames=${it.frames} expect=$expect", kotlin.math.abs(it.frames - expect) <= 10) }
+        WavReader(clip).use { assertTrue("clip frames=${it.frames} expect=$expect", kotlin.math.abs(it.frames - expect) <= 10) }
         shot("4_saved")
     }
 }
