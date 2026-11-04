@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import com.animestemsplitter.data.ResultStore
 import com.animestemsplitter.engine.SeparationPipeline
 import com.animestemsplitter.engine.WavReader
@@ -27,7 +28,9 @@ import kotlin.math.sin
 /** 画面を実際に操作して、切り取りまで通す（スクリーンショットも残す） */
 @RunWith(AndroidJUnit4::class)
 class UiScreenshotTest {
-    @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+    // 通知の許可ダイアログが前に出ると画面を操作できないので、先に許可しておく
+    @get:Rule(order = 0) val perm: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
+    @get:Rule(order = 1) val rule = createAndroidComposeRule<MainActivity>()
     private val ctx = InstrumentationRegistry.getInstrumentation().targetContext
 
     companion object {
