@@ -56,7 +56,10 @@ class OnDeviceTest {
         val t0 = SystemClock.elapsedRealtime()
         val r = SeparationPipeline(ctx).run(
             Uri.fromFile(f), f.name,
-            onProgress = { s, p, _ -> Log.i(tag, "progress $s ${(p * 100).toInt()}%") },
+            onProgress = { s, p, _ ->
+                val pct = (p * 100).toInt()
+                if (pct % 25 == 0) Log.i(tag, "${f.name} progress $s $pct%")
+            },
             isCancelled = { false },
         )
         Log.i(tag, "pipeline done in ${SystemClock.elapsedRealtime() - t0} ms")
