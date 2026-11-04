@@ -6,6 +6,8 @@ status=$?
 adb logcat -d > logcat.txt
 echo "===== exit-info ====="
 adb shell dumpsys activity exit-info com.animestemsplitter | head -80
+echo "===== Trim / test log ====="
+grep -E " Trim |TestRunner|AndroidRuntime" logcat.txt | tail -60
 echo "===== crash buffer ====="
 adb logcat -d -b crash | head -150
 pid=$(grep -oP 'Process com\.animestemsplitter \(pid \K[0-9]+' logcat.txt | head -1)
@@ -16,7 +18,7 @@ grep -n "has died" logcat.txt | head -3
 ln=$(grep -n "Process com.animestemsplitter (pid" logcat.txt | head -1 | cut -d: -f1)
 if [ -n "$ln" ]; then sed -n "$((ln-40)),$((ln+5))p" logcat.txt | grep -v -E "Access denied|achh|nativeloader"; fi
 echo "===== screenshots ====="
-for n in 1_main 2_trim 3_trim_zoom_playing 3b_trim_bgm 4_saved; do
+for n in 1_main 2_trim 3_trim_zoom_playing 3b_trim_bgm 4a_after_save 4_saved; do
   adb exec-out run-as com.animestemsplitter cat files/shots/$n.png > shot_$n.png 2>/dev/null || true
   if [ -s shot_$n.png ]; then echo "SHOT-BEGIN $n"; base64 -w 3000 shot_$n.png; echo "SHOT-END $n"; fi
 done

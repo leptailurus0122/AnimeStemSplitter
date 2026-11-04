@@ -206,10 +206,13 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
     }
     fun save(stems: List<String>) = scope.launch {
         busy = "保存中…"
+        android.util.Log.i("Trim", "save $stems ${selStart}-${selEnd}")
         val ok = runCatching {
             val files = makeClips(stems)
+            android.util.Log.i("Trim", "clips ${files.map { it.absolutePath + ":" + it.length() }}")
             withContext(Dispatchers.IO) { files.forEach { ResultStore.saveToMusic(ctx, it, it.name) } }
         }
+        ok.exceptionOrNull()?.let { android.util.Log.e("Trim", "save failed", it) }
         busy = null
         toastOnMain(
             ctx, if (ok.isSuccess) "「ミュージック/アニメ音声分離」に${stems.size}件保存しました" else "保存できませんでした: ${ok.exceptionOrNull()?.message}",

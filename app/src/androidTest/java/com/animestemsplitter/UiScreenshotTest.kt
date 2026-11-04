@@ -90,13 +90,17 @@ class UiScreenshotTest {
 
         // 切り取って保存
         rule.onNodeWithText("セリフを保存").performScrollTo().performClick()
+        rule.waitForIdle()
+        shot("4a_after_save")
         val r = ResultStore.list(ctx).first()
+        android.util.Log.i("Trim", "test looks in ${ResultStore.clipsDir(r)} results=${ResultStore.list(ctx).map { it.dir.name + "/" + it.name }}")
         val deadline = SystemClock.elapsedRealtime() + 15_000
         var clip: File? = null
         while (SystemClock.elapsedRealtime() < deadline && clip == null) {
             clip = ResultStore.clipsDir(r).listFiles()?.firstOrNull { it.name.contains("dialogue") && it.length() > 44 }
             SystemClock.sleep(200)
         }
+        android.util.Log.i("Trim", "clips dir: ${ResultStore.list(ctx).map { it.dir.name to (java.io.File(it.dir, "clips").list()?.toList()) }}")
         assertTrue("clip not written", clip != null)
         SystemClock.sleep(500)
         val whole = WavReader(r.file("dialogue")).use { it.frames }
