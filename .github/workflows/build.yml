@@ -28,7 +28,11 @@ jobs:
           pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
           pip install onnx onnxruntime numpy pyyaml librosa
       - name: Export ONNX model
-        run: python tools/export_onnx.py --out app/src/main/assets/bandit_plus.onnx
+        run: |
+          set -o pipefail
+          free -h
+          /usr/bin/time -v python -u tools/export_onnx.py --out app/src/main/assets/bandit_plus.onnx 2>&1 | grep -v "^\s*\(Minor\|Major\|Volun\|Invol\|Swaps\|File sys\|Socket\|Signals\|Page size\|Average\|Exit status\|Percent\|System time\|User time\)"
+          test -f app/src/main/assets/bandit_plus.onnx
 
       # 2) アプリをビルド
       - uses: actions/setup-java@v4

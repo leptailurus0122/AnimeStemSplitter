@@ -176,11 +176,16 @@ def main() -> None:
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     kw = dict(input_names=["mix"], output_names=["stems"], opset_version=args.opset, do_constant_folding=True)
+    ref_np = ref.numpy().copy()
+    del ref, got, model
+    import gc
+    gc.collect()
     t0 = time.time()
-    try:
-        torch.onnx.export(em, (x,), str(out), dynamo=False, **kw)
-    except TypeError:
-        torch.onnx.export(em, (x,), str(out), **kw)
+    with torch.no_grad():
+        try:
+            torch.onnx.export(em, (x,), str(out), dynamo=False, **kw)
+        except TypeError:
+            torch.onnx.export(em, (x,), str(out), **kw)
     print(f"[export] {out} ({out.stat().st_size / 1e6:.1f} MB, {time.time() - t0:.0f}s)")
 
     import onnx
@@ -194,7 +199,7 @@ def main() -> None:
     t0 = time.time()
     y = sess.run(None, {"mix": xs})[0]
     dt = time.time() - t0
-    err2 = float(np.abs(y - ref.numpy()).max())
+    err2 = float(np.abs(y - ref_np).max())
     print(f"[check] ONNX Runtime vs original: max|diff|={err2:.2e}")
     print(f"[speed] {dt:.2f}s per 6s chunk on this CPU ({os.cpu_count()} cores)")
     assert err2 < 1e-3 * max(scale, 1e-3), "ONNX output does not match"
