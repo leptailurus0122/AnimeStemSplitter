@@ -3,6 +3,7 @@ package com.animestemsplitter.engine
 import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
+import com.animestemsplitter.data.Diagnostics
 import com.animestemsplitter.data.ResultStore
 import com.animestemsplitter.data.StemResult
 import java.io.File
@@ -49,11 +50,13 @@ class SeparationPipeline(private val context: Context) {
                 val writers = model.stems.map { WavWriter(File(workDir, "$it.wav"), model.sampleRate) }
                 val t0 = SystemClock.elapsedRealtime()
                 onProgress(Stage.SEPARATING, 0f, null)
+                Diagnostics.mark("SEPARATING: 1チャンク目を計算中", "frames=${src.frames}")
                 try {
                     sep.run(
                         src, model,
                         sink = { blocks, frames -> blocks.forEachIndexed { i, b -> writers[i].write(b, frames) } },
                         onChunk = { done, total ->
+                            if (done == 1) Diagnostics.mark("SEPARATING: 1チャンク目完了", "chunks=$total")
                             val per = (SystemClock.elapsedRealtime() - t0) / done.toDouble()
                             val eta = ((total - done) * per / 1000).toInt()
                             onProgress(Stage.SEPARATING, done.toFloat() / total, if (done >= 2) eta else null)

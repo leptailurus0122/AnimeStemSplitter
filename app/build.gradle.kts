@@ -12,9 +12,9 @@ android {
         applicationId = "com.animestemsplitter"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
-        ndk { abiFilters += listOf("arm64-v8a") }
+        versionCode = 2
+        versionName = "1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // 自分の端末に入れる用の署名鍵（毎回同じ鍵で署名して、上書きアップデートできるようにする）
@@ -31,6 +31,11 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("personal")
+            ndk { abiFilters += listOf("arm64-v8a") }
+        }
+        debug {
+            // エミュレーター（x86_64）での自動テスト用
+            ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         }
     }
 
@@ -55,7 +60,10 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.22.0")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

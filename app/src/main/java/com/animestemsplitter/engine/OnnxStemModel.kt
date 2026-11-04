@@ -4,6 +4,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
+import com.animestemsplitter.data.Diagnostics
 import org.json.JSONObject
 import java.io.Closeable
 import java.io.File
@@ -51,16 +52,19 @@ class OnnxStemModel private constructor(
             val file = File(dir, ASSET)
             val assetSize = context.assets.openFd(ASSET).use { it.length }
             if (!file.exists() || file.length() != assetSize) {
+                Diagnostics.mark("LOADING: モデルをコピー中", "size=$assetSize")
                 val tmp = File(dir, "$ASSET.tmp")
                 context.assets.open(ASSET).use { i -> tmp.outputStream().use { o -> i.copyTo(o, 1 shl 20) } }
                 tmp.renameTo(file)
             }
+            Diagnostics.mark("LOADING: ONNX Runtime 初期化", "model=${file.length()} bytes")
             val env = OrtEnvironment.getEnvironment()
             val opts = OrtSession.SessionOptions().apply {
                 setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
                 // 高性能コア中心に使う（小さいコアまで使うと逆に遅くなることがある）
                 setIntraOpNumThreads(Runtime.getRuntime().availableProcessors().coerceIn(1, 6))
             }
+            Diagnostics.mark("LOADING: モデル読み込み (createSession)")
             val session = env.createSession(file.absolutePath, opts)
             val stemsJson = meta.getJSONArray("stems")
             return OnnxStemModel(

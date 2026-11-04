@@ -14,9 +14,9 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
 import com.animestemsplitter.MainActivity
 import com.animestemsplitter.R
+import com.animestemsplitter.data.Diagnostics
 import com.animestemsplitter.data.JobRepository
 import com.animestemsplitter.data.JobState
 import com.animestemsplitter.engine.CancelledException
@@ -45,26 +45,50 @@ class SeparationService : Service() {
         val name = intent.getStringExtra(EXTRA_NAME) ?: "audio"
         if (worker?.isAlive == true) return START_NOT_STICKY
 
-        createChannel()
-        val type = if (Build.VERSION.SDK_INT >= 35) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
-        else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        ServiceCompat.startForeground(this, NOTIF_ID, buildNotification(name, "準備中…", -1), type)
+        try {
+            Diagnostics.mark("サービス開始", "ファイル: $name\nURI: $uri")
+            createChannel()
+            goForeground(name)
+            wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AnimeStemSplitter:separate")
+                .apply { acquire(6 * 60 * 60 * 1000L) }
 
-        wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AnimeStemSplitter:separate")
-            .apply { acquire(6 * 60 * 60 * 1000L) }
-
-        JobRepository.cancelRequested = false
-        JobRepository.update(JobState.Running(name, Stage.LOADING, 0f, null))
-        worker = thread(name = "separation", priority = Thread.MAX_PRIORITY) { work(uri, name) }
+            JobRepository.cancelRequested = false
+            JobRepository.update(JobState.Running(name, Stage.LOADING, 0f, null))
+            worker = thread(name = "separation") { work(uri, name) }
+        } catch (e: Throwable) {
+            Diagnostics.writeCrash("サービス開始", e)
+            Diagnostics.clearMark()
+            JobRepository.update(JobState.Failed(name, "処理を開始できませんでした: ${e.message ?: e.javaClass.simpleName}"))
+            stopSelf()
+        }
         return START_NOT_STICKY
     }
 
+    /** 通知つきで実行（失敗しても処理自体は続ける） */
+    private fun goForeground(name: String) {
+        val n = buildNotification(name, "準備中…", -1)
+        val types = buildList {
+            if (Build.VERSION.SDK_INT >= 35) add(ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING)
+            add(ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        }
+        for (t in types) {
+            try {
+                ServiceCompat.startForeground(this, NOTIF_ID, n, t)
+                return
+            } catch (e: Exception) {
+                Diagnostics.writeCrash("startForeground(type=$t)", e)
+            }
+        }
+    }
+
     private fun work(uri: Uri, name: String) {
+        var lastStage: Stage? = null
         try {
             val result = SeparationPipeline(applicationContext).run(
                 uri, name,
                 onProgress = { stage, frac, eta ->
+                    if (stage != lastStage) { lastStage = stage; Diagnostics.mark(stage.name, "ファイル: $name") }
                     JobRepository.update(JobState.Running(name, stage, frac, eta))
                     notifyProgress(name, stage, frac, eta)
                 },
@@ -79,9 +103,11 @@ class SeparationService : Service() {
             JobRepository.update(JobState.Failed(name, "メモリが足りませんでした。ほかのアプリを閉じてもう一度お試しください。"))
             finishNotification(name, "分離に失敗しました")
         } catch (e: Throwable) {
-            JobRepository.update(JobState.Failed(name, e.message ?: e.javaClass.simpleName))
+            Diagnostics.writeCrash("分離処理（${lastStage ?: "開始前"}）", e)
+            JobRepository.update(JobState.Failed(name, "${e.javaClass.simpleName}: ${e.message ?: ""}"))
             finishNotification(name, "分離に失敗しました")
         } finally {
+            Diagnostics.clearMark()
             wakeLock?.takeIf { it.isHeld }?.release()
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
             stopSelf()
@@ -173,7 +199,8 @@ class SeparationService : Service() {
             val i = Intent(ctx, SeparationService::class.java).setData(uri)
                 .putExtra(EXTRA_NAME, name)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            ContextCompat.startForegroundService(ctx, i)
+            // 画面を開いている間に呼ぶので通常の startService でよい（通知は中で出す）
+            ctx.startService(i)
         }
 
         fun cancel(ctx: Context) {
