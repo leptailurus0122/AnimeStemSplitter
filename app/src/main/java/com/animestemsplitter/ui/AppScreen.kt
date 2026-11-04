@@ -293,10 +293,7 @@ private fun MixerCard(r: StemResult, onTrim: (StemResult, String) -> Unit) {
                 onClick = {
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) { runCatching { ResultStore.exportToMusic(ctx, r) }.isSuccess }
-                        Toast.makeText(
-                            ctx, if (ok) "「ミュージック/アニメ音声分離」に保存しました" else "保存できませんでした",
-                            Toast.LENGTH_LONG,
-                        ).show()
+                        toastOnMain(ctx, if (ok) "「ミュージック/アニメ音声分離」に保存しました" else "保存できませんでした")
                     }
                 },
                 shape = RoundedCornerShape(12.dp),

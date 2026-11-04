@@ -134,8 +134,9 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
 
     var stem by remember { mutableStateOf(initialStem) }
     val color = StemColors.of(stem, dark)
-    var selStart by remember { mutableLongStateOf(0L) }
-    var selEnd by remember { mutableLongStateOf(min(frames, 15L * sr)) }
+    // 最初の選択範囲：短いファイルは真ん中の半分、長いファイルは先頭15秒
+    var selStart by remember { mutableLongStateOf(if (frames <= 30L * sr) frames / 4 else 0L) }
+    var selEnd by remember { mutableLongStateOf(if (frames <= 30L * sr) frames * 3 / 4 else 15L * sr) }
     var viewStart by remember { mutableLongStateOf(0L) }
     var viewEnd by remember { mutableLongStateOf(frames) }
     var loop by remember { mutableStateOf(true) }
@@ -210,16 +211,15 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
             withContext(Dispatchers.IO) { files.forEach { ResultStore.saveToMusic(ctx, it, it.name) } }
         }
         busy = null
-        Toast.makeText(
+        toastOnMain(
             ctx, if (ok.isSuccess) "「ミュージック/アニメ音声分離」に${stems.size}件保存しました" else "保存できませんでした: ${ok.exceptionOrNull()?.message}",
-            Toast.LENGTH_LONG,
-        ).show()
+        )
     }
     fun share(stems: List<String>) = scope.launch {
         busy = "書き出し中…"
         val files = runCatching { makeClips(stems) }.getOrNull()
         busy = null
-        if (files != null) shareFiles(ctx, files)
+        if (files != null) withContext(Dispatchers.Main) { shareFiles(ctx, files) }
     }
 
     Column(
@@ -298,11 +298,13 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
                 val ex = x(selEnd).coerceIn(0f, w)
                 drawRect(color.copy(alpha = 0.16f), topLeft = Offset(sx, 0f), size = Size(ex - sx, h))
                 val n = viewPeaks.size
+                // 小さい音のトラックでも見えるよう、全体の最大値で高さを揃える
+                val norm = 1f / ((overview[stem]?.maxOrNull() ?: 1f).coerceAtLeast(0.02f))
                 if (n > 0) {
                     val bw = w / n
                     for (i in 0 until n) {
                         val cx = i * bw + bw / 2
-                        val amp = (viewPeaks[i].coerceAtMost(1f)) * (h / 2 - 4)
+                        val amp = (viewPeaks[i] * norm).coerceIn(0.01f, 1f) * (h / 2 - 4)
                         val inSel = cx in sx..ex
                         drawLine(
                             if (inSel) color else onSurface.copy(alpha = 0.35f),
@@ -353,9 +355,10 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
                 val p = Clip.downsample(fine, frames, 0, frames, buckets)
                 val bw = size.width / buckets
                 val h = size.height
+                val norm = 1f / (fine.maxOrNull() ?: 1f).coerceAtLeast(0.02f)
                 for (i in p.indices) {
                     val cx = i * bw + bw / 2
-                    val amp = p[i].coerceAtMost(1f) * (h / 2 - 2)
+                    val amp = (p[i] * norm).coerceIn(0.01f, 1f) * (h / 2 - 2)
                     drawLine(onSurface.copy(alpha = 0.3f), Offset(cx, h / 2 - amp), Offset(cx, h / 2 + amp), strokeWidth = max(1f, bw * 0.6f))
                 }
                 fun x(f: Long) = f.toFloat() / frames * size.width
@@ -468,6 +471,10 @@ private fun SmallButton(text: String, onClick: () -> Unit) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
         modifier = Modifier.height(40.dp),
     ) { Text(text, fontSize = 13.sp, maxLines = 1) }
+}
+
+fun toastOnMain(ctx: Context, text: String) {
+    android.os.Handler(android.os.Looper.getMainLooper()).post { Toast.makeText(ctx, text, Toast.LENGTH_LONG).show() }
 }
 
 private fun shareFiles(ctx: Context, files: List<File>) {

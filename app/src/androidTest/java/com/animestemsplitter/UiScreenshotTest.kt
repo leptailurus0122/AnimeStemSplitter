@@ -82,6 +82,9 @@ class UiScreenshotTest {
         rule.onAllNodesWithContentDescription("選択範囲を再生")[0].performClick()
         SystemClock.sleep(1200)
         shot("3_trim_zoom_playing")
+        rule.onNodeWithText("BGM").performClick()
+        SystemClock.sleep(1500)
+        shot("3b_trim_bgm")
 
         // 切り取って保存
         rule.onNodeWithText("セリフを保存").performScrollTo().performClick()
@@ -95,7 +98,7 @@ class UiScreenshotTest {
         assertTrue("clip not written", clip != null)
         SystemClock.sleep(500)
         val whole = WavReader(r.file("dialogue")).use { it.frames }
-        val expect = minOf(whole, 15L * 44100)
+        val expect = if (whole <= 30L * 44100) whole * 3 / 4 - whole / 4 else 15L * 44100
         WavReader(clip!!).use { assertTrue("clip frames=${it.frames} expect=$expect", kotlin.math.abs(it.frames - expect) <= 10) }
         shot("4_saved")
     }
