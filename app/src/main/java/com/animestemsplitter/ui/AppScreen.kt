@@ -323,27 +323,33 @@ private fun StemRow(stem: String, color: Color, mixer: StemMixer, index: Int, r:
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(6.dp).height(92.dp).background(color))
-        Column(Modifier.weight(1f).padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
+        Box(Modifier.width(6.dp).height(104.dp).background(color))
+        Column(Modifier.weight(1f).padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)) {
+            // 1段目：名前と、切り取り・共有
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(label, fontWeight = FontWeight.Bold)
-                Text("  $sub", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("  $sub", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 Spacer(Modifier.weight(1f))
-                FilterChip(selected = solo, onClick = { solo = !solo; mixer.setSolo(index, solo) }, label = { Text("ソロ") })
-                Spacer(Modifier.width(6.dp))
-                FilterChip(selected = mute, onClick = { mute = !mute; mixer.setMute(index, mute) }, label = { Text("ミュート") })
                 IconButton(onClick = onTrim) {
-                    Icon(painterResource(R.drawable.ic_cut), "$label を切り取る", Modifier.size(18.dp))
+                    Icon(painterResource(R.drawable.ic_cut), "$label を切り取る", Modifier.size(20.dp))
                 }
                 IconButton(onClick = { share(ctx, r, listOf(stem)) }) {
-                    Icon(Icons.Filled.Share, "$label を共有", Modifier.size(18.dp))
+                    Icon(Icons.Filled.Share, "$label を共有", Modifier.size(20.dp))
                 }
             }
-            Slider(
-                value = vol, onValueChange = { vol = it; mixer.setVolume(index, it) },
-                colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color),
-                modifier = Modifier.height(32.dp),
-            )
+            // 2段目：音量と、ソロ・ミュート
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Slider(
+                    value = vol, onValueChange = { vol = it; mixer.setVolume(index, it) },
+                    colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color),
+                    modifier = Modifier.weight(1f).height(32.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                FilterChip(selected = solo, onClick = { solo = !solo; mixer.setSolo(index, solo) }, label = { Text("ソロ", maxLines = 1) })
+                Spacer(Modifier.width(6.dp))
+                FilterChip(selected = mute, onClick = { mute = !mute; mixer.setMute(index, mute) }, label = { Text("ミュート", maxLines = 1) })
+                Spacer(Modifier.width(6.dp))
+            }
         }
     }
 }

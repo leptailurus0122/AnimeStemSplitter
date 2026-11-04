@@ -415,7 +415,7 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
 
         // 書き出し
         val (label, _) = STEM_LABELS.getValue(stem)
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = { save(listOf(stem)) }, enabled = busy == null, shape = RoundedCornerShape(12.dp)) {
                 Icon(painterResource(R.drawable.ic_cut), null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp))
                 Text("${label}を保存", fontWeight = FontWeight.Bold)
@@ -423,7 +423,7 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
             OutlinedButton(onClick = { share(listOf(stem)) }, enabled = busy == null, shape = RoundedCornerShape(12.dp)) { Text("共有") }
         }
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             OutlinedButton(onClick = { save(STEMS) }, enabled = busy == null, shape = RoundedCornerShape(12.dp)) {
                 Text("3トラックとも同じ範囲で保存")
             }
@@ -446,17 +446,28 @@ fun TrimScreen(r: StemResult, initialStem: String, onClose: () -> Unit) {
 private fun TimeAdjustRow(label: String, sec: Double, color: Color, onMinus: () -> Unit, onPlus: () -> Unit, onSetHere: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(10.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)).padding(start = 12.dp),
+            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(10.dp)).padding(start = 12.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(8.dp))
-        Text(label, fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(min = 36.dp))
-        Text(Clip.formatSec(sec), fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
-        TextButton(onClick = onMinus) { Text("−0.1秒") }
-        TextButton(onClick = onPlus) { Text("+0.1秒") }
-        TextButton(onClick = onSetHere) { Text("再生位置") }
+        Column(Modifier.weight(1f).padding(vertical = 4.dp)) {
+            Text(label, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+            Text(Clip.formatSec(sec), fontFamily = FontFamily.Monospace, fontSize = 16.sp, maxLines = 1)
+        }
+        SmallButton("−0.1", onMinus)
+        SmallButton("+0.1", onPlus)
+        SmallButton("再生位置", onSetHere)
     }
+}
+
+@Composable
+private fun SmallButton(text: String, onClick: () -> Unit) {
+    TextButton(
+        onClick = onClick,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        modifier = Modifier.height(40.dp),
+    ) { Text(text, fontSize = 13.sp, maxLines = 1) }
 }
 
 private fun shareFiles(ctx: Context, files: List<File>) {
