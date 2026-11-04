@@ -4,6 +4,9 @@ adb logcat -c
 ./gradlew --no-daemon connectedDebugAndroidTest
 status=$?
 adb logcat -d > logcat.txt
-adb shell run-as com.animestemsplitter cat files/diag/crash.txt > device_crash.txt 2>/dev/null || true
-adb shell run-as com.animestemsplitter cat files/diag/running.txt > device_running.txt 2>/dev/null || true
+echo "===== logcat: crash / test lines ====="
+grep -E "FATAL|AndroidRuntime|DEBUG   :|libc    :|backtrace|#[0-9]{2} pc|OnDeviceTest|onnxruntime|MediaCodec.*(rror|xception)|Abort|SIGSEGV|SIGABRT|lowmemory|Process .* has died|Killing" logcat.txt | grep -v "chatty" | head -150
+echo "===== app diag ====="
+adb shell run-as com.animestemsplitter cat files/diag/crash.txt 2>/dev/null || true
+adb shell run-as com.animestemsplitter cat files/diag/running.txt 2>/dev/null || true
 exit $status
