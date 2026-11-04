@@ -1,0 +1,9 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+tools/.cache/
+tools/**/__pycache__/
+app/src/main/assets/bandit_plus.onnx
+app/src/main/assets/model_meta.json

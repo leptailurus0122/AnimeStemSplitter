@@ -1,0 +1,55 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) 学習済みモデルをスマホ用（ONNX）に変換し、元のモデルと結果が一致するか確認
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/cache@v4
+        with:
+          path: tools/.cache
+          key: bandit-plus-weights-v1
+      - name: Install PyTorch (CPU)
+        run: |
+          pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+          pip install onnx onnxruntime numpy pyyaml librosa
+      - name: Export ONNX model
+        run: python tools/export_onnx.py --out app/src/main/assets/bandit_plus.onnx
+
+      # 2) アプリをビルド
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Unit tests
+        run: ./gradlew --no-daemon testReleaseUnitTest
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleRelease
+      - run: cp app/build/outputs/apk/release/app-release.apk AnimeStemSplitter.apk
+
+      # 3) APK を置く（Actions の成果物 + Releases）
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AnimeStemSplitter-apk
+          path: AnimeStemSplitter.apk
+          compression-level: 0
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: アニメ音声分離 (build ${{ github.run_number }})
+          files: AnimeStemSplitter.apk
